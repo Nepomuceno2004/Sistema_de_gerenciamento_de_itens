@@ -11,17 +11,20 @@
 // pino do buzzer de adicionar
 #define BUZZER_PIN 21
 
-// flag do buzzer adicionar
-volatile bool som_adicionar = false;
-volatile bool som_remover = false;
+// pinos dos led
+#define ledAzul 12
 
 // pinos da matriz de led
 #define IS_RGBW false
 #define NUM_PIXELS 25
 #define WS2812_PIN 7
 
+// flag do buzzer adicionar
+volatile bool som_adicionar = false;
+volatile bool som_remover = false;
+
 // total de itens no depósito
-int totalItens = 0;
+volatile int totalItens = 0;
 
 // variável que guarda o último pressionamento dos botões
 volatile uint32_t last_time = 0;
@@ -82,23 +85,23 @@ void gpio_irq_handler(uint gpio, uint32_t event)
     {
         if (gpio == botaoA)
         {
-            totalItens++;
-            set_one_led(0, 2, 0, simboloMais);
-            som_adicionar = true;
-            printf("\nAVISO: Novo item adicionado. Quantidade total: %d\n", totalItens);
+            totalItens++;                                                                // incrementa o item
+            set_one_led(0, 2, 0, simboloMais);                                           // manda o símbolo para a matriz de led
+            som_adicionar = true;                                                        // aciona flag
+            printf("\nAVISO: Novo item adicionado. Quantidade total: %d\n", totalItens); // mensagem uart
         }
         else
         {
             if (totalItens > 0)
             {
-                totalItens--;
-                set_one_led(2, 0, 0, simboloMenos);
-                som_remover = true;
-                printf("\nAVISO: Item Removido. Quantidade total: %d\n", totalItens);
+                totalItens--;                                                         // desconta o item
+                set_one_led(2, 0, 0, simboloMenos);                                   // manda o símbolo para a matriz de led
+                som_remover = true;                                                   // aciona flag
+                printf("\nAVISO: Item Removido. Quantidade total: %d\n", totalItens); // mensagem uart
             }
         }
 
-        last_time = current_time;
+        last_time = current_time; // atualiza a variável último tempo de acionamento
     }
 }
 
@@ -110,27 +113,28 @@ void somBuzzer(uint freq, uint duration_ms)
     // Obtém o número do "slice" PWM associado ao pino
     uint slice = pwm_gpio_to_slice_num(BUZZER_PIN);
 
-    // Calcula o valor do contador 'top' com base na frequência desejada
-    // clock da Pico é 125 MHz, então top = 125_000_000 / freq
+    // Calcula o valor do contador 'top' com base na frequência desejada - 125 MHz/freq
     uint top = 125000000 / freq;
 
-    // Define o valor máximo do contador PWM (o "wrap")
+    // Define o valor máximo do contador PWM (wrap)
     pwm_set_wrap(slice, top);
 
-    // Define o nível do canal PWM (duty cycle)
-    // Aqui está usando 80% do valor máximo (volume mais alto)
+    // Define o duty cycle do canal PWM
+    // Aqui está usando 80% do valor máximo para um volume mais alto
     pwm_set_chan_level(slice, pwm_gpio_to_channel(BUZZER_PIN), (top * 8) / 10);
 
     // Ativa a saída PWM para gerar o som
     pwm_set_enabled(slice, true);
+    gpio_put(ledAzul, true);
 
-    // Mantém o som ativo pelo tempo especificado
+    // Mantém o som ativo pelo tempo passado pelo parâmetro
     sleep_ms(duration_ms);
 
     // Desliga o som
     pwm_set_enabled(slice, false);
+    gpio_put(ledAzul, false);
 
-    // Pequena pausa entre tons (evita sobreposição)
+    // Pequena pausa entre tons
     sleep_ms(20);
 }
 
@@ -148,13 +152,17 @@ int main()
     gpio_set_dir(botaoB, GPIO_IN);
     gpio_pull_up(botaoB);
 
+    // inicialização do led
+    gpio_init(ledAzul);
+    gpio_set_dir(ledAzul, GPIO_OUT);
+
     // inicialização da matriz de led
     PIO pio = pio0;
     int sm = 0;
     uint offset = pio_add_program(pio, &ws2812_program);
     ws2812_program_init(pio, sm, offset, WS2812_PIN, 800000, IS_RGBW);
 
-    // chamada das interrupções
+    // define as interrupções
     gpio_set_irq_enabled_with_callback(botaoA, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
@@ -162,15 +170,17 @@ int main()
     {
         if (som_adicionar)
         {
+            // envia a frequência do som
             somBuzzer(1200, 100);
             somBuzzer(1600, 100);
-            som_adicionar = false;
+            som_adicionar = false; // desliga flag
         }
         if (som_remover)
         {
-            somBuzzer(1000, 120); // tom médio
+            // envia a frequência do som
+            somBuzzer(1000, 120);
             somBuzzer(600, 150);
-            som_remover = false;
+            som_remover = false; // desliga flag
         }
         sleep_ms(100);
     }
