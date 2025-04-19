@@ -52,6 +52,7 @@ pico_generate_pio_header(Sistema_de_gerenciamento_de_itens ${CMAKE_CURRENT_LIST_
 target_link_libraries(Sistema_de_gerenciamento_de_itens
         pico_stdlib
         hardware_pio
+        hardware_pwm
         hardware_i2c
         )
 
