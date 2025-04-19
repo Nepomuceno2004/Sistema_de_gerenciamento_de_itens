@@ -44,9 +44,16 @@ pico_set_program_version(Sistema_de_gerenciamento_de_itens "0.1")
 pico_enable_stdio_uart(Sistema_de_gerenciamento_de_itens 0)
 pico_enable_stdio_usb(Sistema_de_gerenciamento_de_itens 1)
 
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/generated)
+pico_generate_pio_header(Sistema_de_gerenciamento_de_itens ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/generated)
+
+
 # Add the standard library to the build
 target_link_libraries(Sistema_de_gerenciamento_de_itens
-        pico_stdlib)
+        pico_stdlib
+        hardware_pio
+        hardware_i2c
+        )
 
 # Add the standard include files to the build
 target_include_directories(Sistema_de_gerenciamento_de_itens PRIVATE
