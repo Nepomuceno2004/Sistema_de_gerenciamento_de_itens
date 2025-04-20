@@ -1,2 +1,2 @@
-# Sistema_de_gerenciamento_de_itens
+# Sistema de gerenciamento de itens
  
