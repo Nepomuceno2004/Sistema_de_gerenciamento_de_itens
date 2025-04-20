@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(Sistema_de_gerenciamento_de_itens Sistema_de_gerenciamento_de_itens.c )
+add_executable(Sistema_de_gerenciamento_de_itens Sistema_de_gerenciamento_de_itens.c lib/ssd1306.c)
 
 pico_set_program_name(Sistema_de_gerenciamento_de_itens "Sistema_de_gerenciamento_de_itens")
 pico_set_program_version(Sistema_de_gerenciamento_de_itens "0.1")
@@ -54,6 +54,7 @@ target_link_libraries(Sistema_de_gerenciamento_de_itens
         hardware_pio
         hardware_pwm
         hardware_i2c
+        hardware_adc
         )
 
 # Add the standard include files to the build

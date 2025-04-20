@@ -3,6 +3,9 @@
 #include "hardware/pio.h"
 #include "generated/ws2812.pio.h"
 #include "hardware/pwm.h"
+#include "hardware/adc.h"
+#include "lib/ssd1306.h"
+#include "lib/font.h"
 
 // pinos dos botões
 #define botaoA 5
@@ -18,6 +21,16 @@
 #define IS_RGBW false
 #define NUM_PIXELS 25
 #define WS2812_PIN 7
+
+// pinos para o display
+#define I2C_PORT i2c1
+#define I2C_SDA 14
+#define I2C_SCL 15
+#define endereco 0x3C
+
+#define joystick_X 26      // GPIO para eixo X
+#define joystick_Y 27      // GPIO para eixo Y
+#define joystick_Button 22 // GPIO para botão do Joystick
 
 // flag do buzzer adicionar
 volatile bool som_adicionar = false;
@@ -105,6 +118,7 @@ void gpio_irq_handler(uint gpio, uint32_t event)
     }
 }
 
+// função que recebe a frequência para emitir o som
 void somBuzzer(uint freq, uint duration_ms)
 {
     // Define o pino do buzzer como saída PWM
@@ -138,6 +152,19 @@ void somBuzzer(uint freq, uint duration_ms)
     sleep_ms(20);
 }
 
+// captura o centro do joystick
+uint16_t get_center(uint8_t adc_channel)
+{
+    uint32_t sum = 0;
+    for (int i = 0; i < 100; i++)
+    {
+        adc_select_input(adc_channel);
+        sum += adc_read();
+        sleep_ms(5);
+    }
+    return sum / 100;
+}
+
 int main()
 {
     stdio_init_all();
@@ -162,12 +189,63 @@ int main()
     uint offset = pio_add_program(pio, &ws2812_program);
     ws2812_program_init(pio, sm, offset, WS2812_PIN, 800000, IS_RGBW);
 
+    i2c_init(I2C_PORT, 400 * 1000);
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // pino SDA para a i2c
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // pino SCL para a i2c
+    gpio_pull_up(I2C_SDA);                                        // Pull up SDA
+    gpio_pull_up(I2C_SCL);                                        // Pull up SCL
+    ssd1306_t ssd;                                                // Inicializa a estrutura do display
+    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
+    ssd1306_config(&ssd);                                         // Configura o display
+    ssd1306_send_data(&ssd);
+
+    // Limpa o display. O display inicia com todos os pixels apagados.
+    ssd1306_fill(&ssd, false);
+    ssd1306_send_data(&ssd);
+
+    // inicialização do adc
+    adc_init();
+    adc_gpio_init(joystick_X);
+    adc_gpio_init(joystick_Y);
+
+    // configuração do centro do joystick
+    uint16_t adc_value_x;
+    uint16_t adc_value_y;
+    uint16_t center_x = get_center(0);
+    uint16_t center_y = get_center(1);
+
     // define as interrupções
     gpio_set_irq_enabled_with_callback(botaoA, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
     while (true)
     {
+        // Leitura do Joystick
+        adc_select_input(0); // Eixo X (pino 26)
+        adc_value_x = adc_read();
+        adc_select_input(1); // Eixo Y (pino 27)
+        adc_value_y = adc_read();
+
+        // Mapeamento do ADC para a tela, garantindo limites
+        int y = (adc_value_y * 120) / 4095; // Mapeia o eixo X para 120
+        y += 3;                             // Ajusta para começar a partir de 3
+
+        if (y > 120)
+            y = 120; // Limitação para evitar ultrapassar a borda
+
+        int x = 56 - (adc_value_x * 56) / 4095; // Inverte o eixo X
+        x += 3;
+
+        if (x > 56)
+            x = 56;
+        if (x < 3)
+            x = 3;
+
+        ssd1306_fill(&ssd, false);                      // Limpa o display
+        ssd1306_rect(&ssd, x, y, 8, 8, true, true);     // Desenha o quadrado na posição corrigida
+        ssd1306_rect(&ssd, 2, 2, 124, 62, true, false); // Borda
+        ssd1306_send_data(&ssd);                        // Atualiza o display
+
         if (som_adicionar)
         {
             // envia a frequência do som
