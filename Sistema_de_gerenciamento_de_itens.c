@@ -11,7 +11,7 @@
 #define botaoA 5
 #define botaoB 6
 
-// pino do buzzer de adicionar
+// pino do buzzer
 #define BUZZER_PIN 21
 
 // pinos dos led
